@@ -12,6 +12,7 @@ from Crypto.Util import number
 https://pythontic.com/modules/socket/udp-client-server-example?fbclid=IwAR2fbrVyX4wloO4sbGrWv5CzNJX1tZk6ydcTEapxvbLhX2ejh3sPJVsaZEA
 https://www.youtube.com/watch?v=3QiPPX-KeSc
 https://blog.ruanbekker.com/blog/2018/04/30/encryption-and-decryption-with-the-pycrypto-module-using-the-aes-cipher-in-python/
+https://wiki.python.org/moin/UdpCommunication
 '''
 
 LOCAL_IP = "127.0.0.1"
