@@ -18,7 +18,7 @@ UDP_client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 UDP_client_socket.connect((LOCAL_IP, LOCAL_PORT))
 
 def generate_DH_values(P, G, x):
-    b = 3
+    b = random.randint(9999, 99999)
     y = int(pow(G, b, P))
     return b, y
 

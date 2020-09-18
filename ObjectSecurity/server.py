@@ -6,6 +6,7 @@ import random
 import string
 import base64
 from Crypto.Cipher import AES
+from Crypto.Util import number
 
 '''
 https://pythontic.com/modules/socket/udp-client-server-example?fbclid=IwAR2fbrVyX4wloO4sbGrWv5CzNJX1tZk6ydcTEapxvbLhX2ejh3sPJVsaZEA
@@ -24,9 +25,11 @@ UDP_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 UDP_server_socket.bind((LOCAL_IP, LOCAL_PORT))
 
 def generate_DH_values():
-    P = 23
-    G = 9
-    a = 4
+    """ Function that retrieves the values used in Diffie-Hellman """
+    _prime_length = 96
+    P = number.getPrime(_prime_length)
+    G = number.getPrime(_prime_length)
+    a = random.randint(9999, 99999)
     x = int(pow(G, a, P))
     return P, G, a, x
 
