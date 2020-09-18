@@ -16,13 +16,13 @@ https://wiki.python.org/moin/UdpCommunication
 '''
 
 LOCAL_IP = "127.0.0.1"
-LOCAL_PORT = 20002
+LOCAL_PORT = 20001
 
 BUFFER_SIZE = 64
 FORMAT = 'utf-8'
 DISCONNECT_MESSAGE = "!disconnect"
 
-UDP_server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+UDP_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 UDP_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 UDP_server_socket.bind((LOCAL_IP, LOCAL_PORT))
 
