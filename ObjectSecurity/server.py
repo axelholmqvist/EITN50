@@ -22,6 +22,7 @@ FORMAT = 'utf-8'
 DISCONNECT_MESSAGE = "!disconnect"
 
 UDP_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+UDP_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 UDP_server_socket.bind((LOCAL_IP, LOCAL_PORT))
 
 def generate_DH_values():
