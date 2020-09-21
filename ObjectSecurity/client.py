@@ -66,16 +66,45 @@ def aes_encrypt(message, key):
     
     return encoded_iv, encoded_encrypted_message
 
+def aes_decrypt(encrypted_message, key, iv):
+    """
+    Function that decrypts the messages received. 
+
+    Returns the decrypted and decoded message.
+    """
+    decryption_suite = AES.new(key, AES.MODE_CFB, iv)
+    decrypted_message = decryption_suite.decrypt(base64.b64decode(encrypted_message))
+    return decrypted_message.decode()
+
 def start_session():
     """
     Starts a new session. Each session starts with a handshake. After the handshake is complete,
     encrypted messages are sent to the server.
     """
     sock.sendto(b"Hello", (UDP_IP, UDP_PORT))
-    print("\nSent to server: b'Hello'")
+    print("\nSent to server: Hello")
     derived_key = ecdh_handshake()
-    iv, encrypted_message = aes_encrypt(input("Write message to server: "), derived_key)
+
+    #Username
+    iv, encrypted_message = aes_encrypt(input("\nUsername: "), derived_key)
     sock.sendto(iv, (UDP_IP, UDP_PORT))
     sock.sendto(encrypted_message, (UDP_IP, UDP_PORT))
+
+    #Password
+    iv, encrypted_message = aes_encrypt(input("Password: "), derived_key)
+    sock.sendto(iv, (UDP_IP, UDP_PORT))
+    sock.sendto(encrypted_message, (UDP_IP, UDP_PORT))
+
+    # Receive authentication status
+    iv, _ = sock.recvfrom(BUFFER_SIZE)
+    encrypted_authentication, _ = sock.recvfrom(BUFFER_SIZE)
+    decrypted_authentication = aes_decrypt(encrypted_authentication, derived_key, iv)
+
+    print(f"\n[SERVER]: {decrypted_authentication }")
+    if decrypted_authentication == 'AUTHENTICATION SUCCESSFUL':
+        #Message
+        iv, encrypted_message = aes_encrypt(input("Send message to server: "), derived_key)
+        sock.sendto(iv, (UDP_IP, UDP_PORT))
+        sock.sendto(encrypted_message, (UDP_IP, UDP_PORT))
 
 start_session()
