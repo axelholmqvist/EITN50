@@ -16,6 +16,7 @@ from Crypto.Cipher import AES
 
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5005
+BUFFER_SIZE = 64
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Internet, UDP
 
@@ -24,7 +25,7 @@ def handshake():
     client_public_key = client_private_key.public_key()
     encoded_client_public_key = client_public_key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)
     
-    server_public_key, address = sock.recvfrom(1024)
+    server_public_key, address = sock.recvfrom(BUFFER_SIZE)
     print(f"Received from server: {server_public_key}")
 
     sock.sendto(encoded_client_public_key, (UDP_IP, UDP_PORT))

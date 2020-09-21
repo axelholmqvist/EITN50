@@ -21,7 +21,7 @@ https://cryptography.io/en/latest/hazmat/primitives/asymmetric/dh/
 
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5005
-FORMAT = 'utf-8'
+BUFFER_SIZE = 64
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Internet, UDP
 sock.bind((UDP_IP, UDP_PORT))
@@ -38,7 +38,7 @@ def handshake(client_ip, client_port):
     sock.sendto(encoded_server_public_key, (client_ip, client_port))
     time.sleep(1)
 
-    client_public_key, address = sock.recvfrom(1024)
+    client_public_key, _ = sock.recvfrom(BUFFER_SIZE)
     print(f"Received from client: {client_public_key}")
 
     shared_key = server_private_key.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP384R1(), client_public_key))
@@ -62,13 +62,13 @@ def start():
     print("Server is up and running!")
 
     while True:
-        message, address = sock.recvfrom(1024) # buffer size is 1024 bytes
+        message, address = sock.recvfrom(BUFFER_SIZE)
         client_ip = address[0]
         client_port = address[1]
         print(f"\n[{client_ip}:{client_port}]: {message}")
         derived_key = handshake(client_ip, client_port)
-        iv, _ = sock.recvfrom(1024)
-        encrypted_message, _ = sock.recvfrom(1024)
+        iv, _ = sock.recvfrom(BUFFER_SIZE)
+        encrypted_message, _ = sock.recvfrom(BUFFER_SIZE)
         decrypted_message = decrypt(encrypted_message, derived_key, iv)
 
         print(f"\n{decrypted_message}")
