@@ -25,7 +25,7 @@ def handshake():
     client_public_key = client_private_key.public_key()
     encoded_client_public_key = client_public_key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)
     
-    server_public_key, address = sock.recvfrom(BUFFER_SIZE)
+    server_public_key, _ = sock.recvfrom(BUFFER_SIZE)
     print(f"Received from server: {server_public_key}")
 
     sock.sendto(encoded_client_public_key, (UDP_IP, UDP_PORT))
