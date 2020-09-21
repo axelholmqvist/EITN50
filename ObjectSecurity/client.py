@@ -5,67 +5,61 @@ import pickle
 import random
 import string
 import base64
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives import hashes
+
 from Crypto.Cipher import AES
 
-LOCAL_IP = "127.0.0.1"
-LOCAL_PORT = 20001
+UDP_IP = "127.0.0.1"
+UDP_PORT = 5005
 
-BUFFER_SIZE = 64
-FORMAT = 'utf-8'
-DISCONNECT_MESSAGE = "!disconnect"
-
-UDP_client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-UDP_client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-UDP_client_socket.connect((LOCAL_IP, LOCAL_PORT))
-
-def generate_DH_values(P, G, x):
-    b = random.randint(9999, 99999)
-    y = int(pow(G, b, P))
-    return b, y
-
-def generate_DH_secret(x, b, P):
-    secret = int(pow(x, b, P))
-    return secret
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Internet, UDP
 
 def handshake():
-    # Diffie Hellman secret
-    print(f"\n[SERVER] {UDP_client_socket.recv(2048).decode(FORMAT)}")
-    P = int(UDP_client_socket.recv(2048).decode(FORMAT))
-    G = int(UDP_client_socket.recv(2048).decode(FORMAT))
-    x = int(UDP_client_socket.recv(2048).decode(FORMAT))
-    print(f"\n[SERVER] P: {P}, G: {G}, x: {x}")
-    b, y = generate_DH_values(P, G, x)
-    UDP_client_socket.send(f"{y}".encode(FORMAT))
-    secret = generate_DH_secret(x, b, P)
-    print(f"\nSecret: {secret}")
+    client_private_key = ec.generate_private_key(ec.SECP384R1, default_backend())
+    client_public_key = client_private_key.public_key()
+    encoded_client_public_key = client_public_key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)
+    
+    server_public_key, address = sock.recvfrom(1024)
+    print(f"Received from server: {server_public_key}")
 
-    # AES Encryption Key and IV
-    key = str(secret).zfill(32)
-    print(f"\nKey: {key}")
+    sock.sendto(encoded_client_public_key, (UDP_IP, UDP_PORT))
+    time.sleep(1)
 
-    iv = UDP_client_socket.recv(2048).decode(FORMAT)
-    print(f"\nIV: {iv}")
+    shared_key = client_private_key.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP384R1(), server_public_key))
+    print(f"\n{shared_key}")
 
-    return key, iv
+    derived_key = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=b'handshake data',
+    ).derive(shared_key)
 
-def encrypt(message, key, iv):
+    print(f"\n{derived_key}")
+
+    return derived_key
+
+def encrypt(message, key):
+    iv = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(16))
+    encoded_iv = iv.encode('utf-8')
+
     encryption_suite = AES.new(key, AES.MODE_CFB, iv)
     encrypted_message = encryption_suite.encrypt(message)
     encoded_encrypted_message = base64.b64encode(encrypted_message)
-    return encoded_encrypted_message
+    
+    return encoded_iv, encoded_encrypted_message
 
-def decrypt(encrypted_message, key, iv):
-    decryption_suite = AES.new(key, AES.MODE_CFB, iv)
-    decrypted_message = decryption_suite.decrypt(base64.b64decode(encrypted_message))
-    return decrypted_message
+def start():
+    sock.sendto(b"Hello", (UDP_IP, UDP_PORT))
+    print("\nSent to server: b'Hello'")
+    derived_key = handshake()
+    iv, encrypted_message = encrypt("HEJHEJ!", derived_key)
+    sock.sendto(iv, (UDP_IP, UDP_PORT))
+    sock.sendto(encrypted_message, (UDP_IP, UDP_PORT))
 
-def send(message):
-    UDP_client_socket.send(encrypt(message, key, iv))
-
-key, iv = handshake()
-
-while True:
-    input_message = input('\nSend message: ')
-    send(input_message)
-    if input_message == DISCONNECT_MESSAGE:
-        break
+start()
