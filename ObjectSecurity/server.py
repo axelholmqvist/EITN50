@@ -14,7 +14,6 @@ from Crypto.Cipher import AES
 
 """
 Sources:
-
 https://stackoverflow.com/questions/57286946/python-diffie-hellman-exchange-cryptography-library-shared-key-not-the-same
 https://cryptography.io/en/latest/hazmat/primitives/asymmetric/dh/
 """
@@ -32,25 +31,28 @@ sock.bind((UDP_IP, UDP_PORT))
 def ecdh_handshake(client_ip, client_port):
     """
     Function that manages the handshake performed with the ECDH algorithm.
-
     Returns the derived key (shared secret)
     """
-    print("Initializing handshake...")
+    print("\nInitializing handshake...")
     time.sleep(1)
 
     server_private_key = ec.generate_private_key(ec.SECP384R1, default_backend())
     server_public_key = server_private_key.public_key()
     encoded_server_public_key = server_public_key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)
 
+    print("Public key sent to client")
     sock.sendto(encoded_server_public_key, (client_ip, client_port))
     time.sleep(1)
 
+    print("Public key received from client")
     client_public_key, _ = sock.recvfrom(BUFFER_SIZE)
-    print(f"Received from client: {client_public_key}")
+    #print(client_public_key)
 
+    print("Calculating shared key...")
     shared_key = server_private_key.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP384R1(), client_public_key))
-    print(f"\n{shared_key}")
+    #print(shared_key)
 
+    print("Generating derived key...")
     derived_key = HKDF(
         algorithm=hashes.SHA256(),
         length=32,
@@ -58,14 +60,14 @@ def ecdh_handshake(client_ip, client_port):
         info=b'handshake data',
     ).derive(shared_key)
 
-    print(f"\n{derived_key}")
+    print("Handshake is finished!")
+    #print(derived_key)
 
     return derived_key
 
 def aes_encrypt(message, key):
     """
     Function responsible for encrypting the messages using AES.
-
     Returns the initialization vector and encrypted message.
     """
     iv = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(16))
@@ -80,7 +82,6 @@ def aes_encrypt(message, key):
 def aes_decrypt(encrypted_message, key, iv):
     """
     Function that decrypts the messages received from the client. 
-
     Returns the decrypted and decoded message.
     """
     decryption_suite = AES.new(key, AES.MODE_CFB, iv)
@@ -88,36 +89,42 @@ def aes_decrypt(encrypted_message, key, iv):
     return decrypted_message.decode()
 
 def simple_authentication(derived_key, client_ip, client_port):
-    # Receive username
-    iv, _ = sock.recvfrom(BUFFER_SIZE)
-    encrypted_username, _ = sock.recvfrom(BUFFER_SIZE)
-    decrypted_username = aes_decrypt(encrypted_username, derived_key, iv)
+    username = receive(derived_key)
+    password = receive(derived_key)
 
-    # Receive password
-    iv, _ = sock.recvfrom(BUFFER_SIZE)
-    encrypted_password, _ = sock.recvfrom(BUFFER_SIZE)
-    decrypted_password = aes_decrypt(encrypted_password, derived_key, iv)
-
-    if decrypted_username == admin_user[0] and decrypted_password == admin_user[1]:
-        send("AUTHENTICATION SUCCESSFUL", derived_key, client_ip, client_port)
-        print(f"\n[{client_ip}:{client_port}]: AUTHENTICATION SUCCESSFUL")
+    if username == admin_user[0] and password == admin_user[1]:
+        send("Successful authentication", derived_key, client_ip, client_port)
+        print(f"\n{client_ip}:{client_port} successfully authenticated")
         return True
     else:
-        send("INVALID AUTHENTICATION", derived_key, client_ip, client_port)
-        print(f"\n[{client_ip}:{client_port}]: INVALID AUTHENTICATION")
+        send("Unsuccessful authentication", derived_key, client_ip, client_port)
+        print(f"\n{client_ip}:{client_port} unsuccessfully authenticated")
         return False
 
 def send(message, derived_key, client_ip, client_port):
+    """
+    Function for encrypting and sending a message (+ the iv).
+    """
     iv, encrypted_message = aes_encrypt(message, derived_key)
     sock.sendto(iv, (client_ip, client_port))
     sock.sendto(encrypted_message, (client_ip, client_port))
 
+def receive(derived_key):
+    """
+    Function for receiving and decrypting an encrypted message (+ the iv).
+    Returns the decrypted message.
+    """
+    iv, _ = sock.recvfrom(BUFFER_SIZE)
+    encrypted_message, _ = sock.recvfrom(BUFFER_SIZE)
+    decrypted_message = aes_decrypt(encrypted_message, derived_key, iv)
+    return decrypted_message
+
 def start_server():
     """
-    Starts the server and the session. The server listens for messages from the client.
-    The session consist of the handshake and receiving messages. 
+    Starts the server and the session. The server listens for a 'Hello' from the client.
+    The session consist of the handshake and receiving a message (if authenticated). 
     """
-    print("Starting server...")
+    print("\nStarting server...")
     time.sleep(1)
     print("Server is up and running!")
 
@@ -132,6 +139,7 @@ def start_server():
         encrypted_message, _ = sock.recvfrom(BUFFER_SIZE)
         decrypted_message = aes_decrypt(encrypted_message, derived_key, iv)
         print(f"\n[{client_ip}:{client_port}]: {decrypted_message}")
+        print("\n")
     else:
         pass
 

@@ -12,7 +12,6 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 from Crypto.Cipher import AES
 
-
 """ Client socket values """
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5004
@@ -22,39 +21,42 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 def ecdh_handshake():
     """
     Function that manages the handshake performed with the ECDH algorithm.
-
     Returns the derived key (shared secret)
     """
+    print("\nHandshake started...")
+
     client_private_key = ec.generate_private_key(ec.SECP384R1, default_backend())
     client_public_key = client_private_key.public_key()
     encoded_client_public_key = client_public_key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)
 
-    #Receives public key from server
+    print("Public key received from server")
     server_public_key, _ = sock.recvfrom(BUFFER_SIZE)
-    print(f"Received from server: {server_public_key}")
+    #print(server_public_key)
 
-    #Sends public key to server
+    print("Public key sent to server")
     sock.sendto(encoded_client_public_key, (UDP_IP, UDP_PORT))
     time.sleep(1)
 
+    print("Calculating shared key...")
     shared_key = client_private_key.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP384R1(), server_public_key))
-    print(f"\n{shared_key}")
+    #print(shared_key)
 
+    print("Generating derived key...")
     derived_key = HKDF(
         algorithm=hashes.SHA256(),
         length=32,
         salt=None,
         info=b'handshake data',
     ).derive(shared_key)
-
-    print(f"\n{derived_key}")
+    
+    print("Handshake is finished!")
+    #print(derived_key)
 
     return derived_key
 
 def aes_encrypt(message, key):
     """
     Function responsible for encrypting the messages using AES.
-
     Returns the initialization vector and encrypted message.
     """
     iv = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(16))
@@ -69,42 +71,49 @@ def aes_encrypt(message, key):
 def aes_decrypt(encrypted_message, key, iv):
     """
     Function that decrypts the messages received. 
-
     Returns the decrypted and decoded message.
     """
     decryption_suite = AES.new(key, AES.MODE_CFB, iv)
     decrypted_message = decryption_suite.decrypt(base64.b64decode(encrypted_message))
     return decrypted_message.decode()
 
+def send(message, derived_key, client_ip, client_port):
+    """
+    Function for encrypting and sending a message (+ the iv).
+    """
+    iv, encrypted_message = aes_encrypt(message, derived_key)
+    sock.sendto(iv, (client_ip, client_port))
+    sock.sendto(encrypted_message, (client_ip, client_port))
+
+def receive(derived_key):
+    """
+    Function for receiving and decrypting an encrypted message (+ the iv).
+    Returns the decrypted message.
+    """
+    iv, _ = sock.recvfrom(BUFFER_SIZE)
+    encrypted_message, _ = sock.recvfrom(BUFFER_SIZE)
+    decrypted_message = aes_decrypt(encrypted_message, derived_key, iv)
+    return decrypted_message
+
 def start_session():
     """
-    Starts a new session. Each session starts with a handshake. After the handshake is complete,
+    Starts a new session with sending a 'Hello' to the server. 
+    Each session starts with a handshake. After the handshake is complete,
     encrypted messages are sent to the server.
     """
-    sock.sendto(b"Hello", (UDP_IP, UDP_PORT))
-    print("\nSent to server: Hello")
+    hello_message = b"Hello"
+
+    sock.sendto(hello_message, (UDP_IP, UDP_PORT))
+    print(f"\nSent to server: {hello_message.decode()}")
     derived_key = ecdh_handshake()
 
-    #Username
-    iv, encrypted_message = aes_encrypt(input("\nUsername: "), derived_key)
-    sock.sendto(iv, (UDP_IP, UDP_PORT))
-    sock.sendto(encrypted_message, (UDP_IP, UDP_PORT))
+    send(input("\nUsername: "), derived_key, UDP_IP, UDP_PORT)
+    send(input("Password: "), derived_key, UDP_IP, UDP_PORT)
+    authentication_status = receive(derived_key)
 
-    #Password
-    iv, encrypted_message = aes_encrypt(input("Password: "), derived_key)
-    sock.sendto(iv, (UDP_IP, UDP_PORT))
-    sock.sendto(encrypted_message, (UDP_IP, UDP_PORT))
-
-    # Receive authentication status
-    iv, _ = sock.recvfrom(BUFFER_SIZE)
-    encrypted_authentication, _ = sock.recvfrom(BUFFER_SIZE)
-    decrypted_authentication = aes_decrypt(encrypted_authentication, derived_key, iv)
-
-    print(f"\n[SERVER]: {decrypted_authentication }")
-    if decrypted_authentication == 'AUTHENTICATION SUCCESSFUL':
-        #Message
-        iv, encrypted_message = aes_encrypt(input("Send message to server: "), derived_key)
-        sock.sendto(iv, (UDP_IP, UDP_PORT))
-        sock.sendto(encrypted_message, (UDP_IP, UDP_PORT))
+    print(f"\n[SERVER]: {authentication_status}")
+    if authentication_status == 'Successful authentication':
+        send(input("\nSafe message to server: "), derived_key, UDP_IP, UDP_PORT)
+        print("\n")
 
 start_session()
