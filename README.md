@@ -5,5 +5,6 @@ Projects related to EITN50, Advanced Computer Security, at LTH.
 Run main.py. Comment/Uncomment the sections you would like to get printed.
 
 ## 2. Object Security
-Run server.py, then run client.py.
+Run server.py to start server. 
+Run client.py to start client (which immediately send a 'Hello' to server and starts a session).
 Username: admin, Password: supersafepw
