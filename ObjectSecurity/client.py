@@ -101,6 +101,9 @@ def start_session():
     Each session starts with a handshake. After the handshake is complete,
     encrypted messages are sent to the server.
     """
+    print("\nStarting client...")
+    time.sleep(1)
+    print("Client is up and running!")
     hello_message = b"Hello"
 
     sock.sendto(hello_message, (UDP_IP, UDP_PORT))
